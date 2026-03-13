@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>直角平面最小 Steiner 树 · 计算与演示</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+
+:root {
+/* Claude API Docs palette */
+--bg:       #f5f2ec;   /* warm cream page bg */
+--panel:    #ffffff;   /* sidebar / header */
+--panel2:   #f9f7f3;   /* card / input bg */
+--border:   #e4dfd6;   /* subtle warm gray */
+--border2:  #d4cdc3;   /* slightly stronger */
+
+```
+/* Anthropic brand orange + supporting tones */
+--accent:   #c96a2e;   /* primary orange (logo, links, highlights) */
+--accent-h: #a8531f;   /* hover darken */
+--accent-l: #f5ece4;   /* light tint for active states */
+
+/* Algorithm visualization colours — warm & accessible on cream */
+--rmst-col: #8a9bb0;   /* muted steel-blue   — RMST baseline */
+--approx-col:#2e9e5e;  /* forest green       — 2-approx */
+--steiner:  #7c4db8;   /* violet             — Steiner points */
+--terminal: #c96a2e;   /* orange = accent    — terminal pts */
+--anim-hl:  #c96a2e;   /* orange highlight in animation */
+
+/* Text */
+--text:     #1a1714;   /* near-black body */
+--text2:    #3d3530;   /* secondary text */
+--dim:      #7a6f67;   /* tertiary / labels */
+--muted:    #b0a49a;   /* placeholder / disabled */
+```
+
+}
+
+- {margin:0;padding:0;box-sizing:border-box;}
+
+body{
+font-family:'Inter','Noto Sans SC',sans-serif;
+background:var(--bg);color:var(--text);
+height:100vh;display:flex;flex-direction:column;overflow:hidden;
+font-size:13px;line-height:1.5;
+}
+
+/* ── Header ─────────────────────────────────── */
+header{
+display:flex;align-items:center;justify-content:space-between;
+padding:11px 22px;
+background:var(--panel);
+border-bottom:1px solid var(--border);
+flex-shrink:0;
+box-shadow:0 1px 3px rgba(0,0,0,.04);
+}
+.htitle{display:flex;align-items:baseline;gap:12px;}
+.htitle h1{
+font-family:'Lora',serif;
+font-size:16px;font-weight:500;
+color:var(--text);letter-spacing:-.01em;
+}
+.htitle .sub{
+font-family:'JetBrains Mono',monospace;
+font-size:10px;color:var(--accent);
+letter-spacing:.07em;text-transform:uppercase;
+font-weight:400;
+}
+.hmeta{
+font-family:'JetBrains Mono',monospace;
+font-size:11px;color:var(--dim);
+display:flex;gap:16px;align-items:center;
+}
+.sdot{
+display:inline-block;width:6px;height:6px;
+border-radius:50%;background:var(--approx-col);
+margin-right:5px;animation:pulse 2.5s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+/* ── Layout ─────────────────────────────────── */
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* ── Sidebar ─────────────────────────────────── */
+.sidebar{
+width:272px;background:var(--panel);
+border-right:1px solid var(--border);
+display:flex;flex-direction:column;
+overflow-y:auto;flex-shrink:0;
+}
+.sec{padding:14px;border-bottom:1px solid var(--border);}
+.stitle{
+font-family:'JetBrains Mono',monospace;
+font-size:9px;text-transform:uppercase;
+letter-spacing:.14em;color:var(--muted);
+margin-bottom:10px;font-weight:500;
+}
+
+/* ── Buttons ─────────────────────────────────── */
+.btn{
+width:100%;padding:8px 11px;
+border:1px solid var(--border);
+background:var(--panel2);color:var(--text2);
+font-family:'Inter','Noto Sans SC',sans-serif;
+font-size:12px;font-weight:400;
+cursor:pointer;border-radius:6px;
+margin-bottom:5px;transition:all .14s;
+display:flex;align-items:center;gap:7px;text-align:left;
+}
+.btn:hover{
+border-color:var(--accent);color:var(--accent);
+background:var(--accent-l);
+}
+.btn:active{transform:scale(.985);}
+
+.btn.dng{color:#c53030;border-color:#f0d5d5;}
+.btn.dng:hover{border-color:#c53030;background:#fdf0f0;color:#c53030;}
+
+.btn.exp{color:#7c5a1e;border-color:#e8d8b8;}
+.btn.exp:hover{border-color:#c96a2e;background:var(--accent-l);color:var(--accent);}
+
+.bi{
+width:16px;height:16px;border-radius:4px;
+display:flex;align-items:center;justify-content:center;
+font-size:9px;flex-shrink:0;
+}
+.btn-rmst .bi{background:#e8eef6;color:#8a9bb0;}
+.btn-approx .bi{background:var(--accent-l);color:var(--accent);}
+
+/* ── Param rows ─────────────────────────────── */
+.prow{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.plabel{font-size:12px;color:var(--dim);}
+.pinput{display:flex;align-items:center;gap:5px;}
+.pinput button{
+width:22px;height:22px;
+background:var(--panel2);border:1px solid var(--border2);
+color:var(--dim);cursor:pointer;border-radius:4px;
+font-size:14px;display:flex;align-items:center;justify-content:center;
+transition:all .14s;
+}
+.pinput button:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-l);}
+.pval{
+font-family:'JetBrains Mono',monospace;
+font-size:14px;color:var(--accent);
+font-weight:600;width:26px;text-align:center;
+}
+
+/* ── Speed slider ─────────────────────────────── */
+.srow{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.slabel{font-size:11px;color:var(--dim);flex-shrink:0;width:56px;}
+.sslider{
+flex:1;-webkit-appearance:none;height:3px;
+background:var(--border2);border-radius:2px;outline:none;
+}
+.sslider::-webkit-slider-thumb{
+-webkit-appearance:none;width:12px;height:12px;
+border-radius:50%;background:var(--accent);cursor:pointer;
+box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.slval{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);width:26px;text-align:right;}
+
+/* ── Anim controls ─────────────────────────── */
+.actrls{display:flex;gap:4px;margin-top:7px;}
+.abtn{
+flex:1;padding:5px;
+border:1px solid var(--border);
+background:var(--panel2);color:var(--dim);
+font-family:'JetBrains Mono',monospace;font-size:10px;
+cursor:pointer;border-radius:4px;
+transition:all .14s;display:flex;align-items:center;justify-content:center;gap:3px;
+}
+.abtn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-l);}
+.abtn:disabled{opacity:.35;cursor:default;}
+.apwrap{
+background:var(--panel2);border:1px solid var(--border);
+border-radius:10px;overflow:hidden;height:4px;margin-top:7px;
+}
+.apbar{height:100%;background:var(--accent);transition:width .12s;width:0%;border-radius:10px;}
+.sinfo{
+font-family:'JetBrains Mono',monospace;font-size:10px;
+color:var(--dim);margin-top:5px;line-height:1.55;min-height:30px;
+}
+
+/* ── Legend ─────────────────────────────────── */
+.li{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);margin-bottom:5px;}
+.ldot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.lline{width:18px;height:2px;flex-shrink:0;border-radius:1px;}
+
+/* ── Comparison table ────────────────────────── */
+.ctbl{width:100%;border-collapse:collapse;font-size:11px;}
+.ctbl th{
+font-family:'JetBrains Mono',monospace;font-size:9px;
+text-transform:uppercase;letter-spacing:.07em;
+color:var(--muted);padding:4px 5px;text-align:left;
+border-bottom:1px solid var(--border);
+}
+.ctbl td{
+padding:5px 5px;
+border-bottom:1px solid var(--border);
+font-family:'JetBrains Mono',monospace;font-size:10px;
+color:var(--dim);
+}
+.ctbl tr:last-child td{border-bottom:none;}
+.cv{color:var(--text)!important;font-weight:600;}
+.cbest{color:var(--approx-col)!important;font-weight:700;}
+.cdiff{font-size:9px;color:var(--approx-col);}
+
+/* ── Result cards ────────────────────────────── */
+.rcard{
+background:var(--panel2);border:1px solid var(--border);
+border-radius:7px;padding:10px;margin-bottom:6px;
+display:none;animation:fin .22s ease;
+box-shadow:0 1px 3px rgba(0,0,0,.04);
+}
+.rcard.active{display:block;}
+@keyframes fin{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+.rlabel{
+font-family:'JetBrains Mono',monospace;font-size:9px;
+color:var(--muted);text-transform:uppercase;
+letter-spacing:.1em;margin-bottom:4px;
+}
+.rval{
+font-family:'JetBrains Mono',monospace;
+font-size:20px;font-weight:600;line-height:1;margin-bottom:3px;
+}
+.rsub{font-size:10px;color:var(--dim);}
+
+/* ── Canvas area ─────────────────────────────── */
+.carea{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+.ctbar{
+display:flex;align-items:center;gap:10px;
+padding:8px 14px;background:var(--panel);
+border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.chint{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.tbtn{
+padding:3px 9px;border:1px solid var(--border);
+background:transparent;color:var(--dim);
+font-family:'JetBrains Mono',monospace;font-size:10px;
+cursor:pointer;border-radius:4px;transition:all .14s;
+}
+.tbtn:hover,.tbtn.active{
+border-color:var(--accent);color:var(--accent);
+background:var(--accent-l);
+}
+canvas{flex:1;cursor:crosshair;display:block;}
+
+/* ── Stats bar ─────────────────────────────── */
+.sbar{display:flex;background:var(--panel);border-top:1px solid var(--border);flex-shrink:0;}
+.si{flex:1;padding:6px 12px;border-right:1px solid var(--border);}
+.si:last-child{border-right:none;}
+.si .sil{
+font-family:'JetBrains Mono',monospace;font-size:8px;
+text-transform:uppercase;letter-spacing:.1em;
+color:var(--muted);margin-bottom:2px;
+}
+.si .siv{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--text);}
+
+/* ── Right log panel ─────────────────────────── */
+.rpanel{
+width:220px;background:var(--panel);
+border-left:1px solid var(--border);
+display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;
+}
+.lentry{
+padding:7px 13px;border-bottom:1px solid var(--border);
+font-size:10px;font-family:'JetBrains Mono',monospace;
+color:var(--dim);line-height:1.5;animation:fin .2s ease;
+}
+.ltime{color:var(--muted);font-size:9px;}
+.lmsg{color:var(--text2);}
+.lval{color:var(--accent);font-weight:500;}
+.pchip{
+display:inline-flex;align-items:center;gap:3px;
+background:var(--panel2);border:1px solid var(--border);
+border-radius:4px;padding:2px 6px;
+font-family:'JetBrains Mono',monospace;font-size:9px;
+color:var(--dim);margin:2px;cursor:pointer;transition:all .14s;
+}
+.pchip:hover{border-color:#c53030;color:#c53030;background:#fdf0f0;}
+
+/* ── Notify toast ─────────────────────────────── */
+.notify{
+position:fixed;top:54px;left:50%;
+transform:translateX(-50%) translateY(-12px);
+background:var(--text);color:var(--panel);
+padding:6px 16px;border-radius:20px;
+font-family:'JetBrains Mono',monospace;font-size:11px;
+pointer-events:none;opacity:0;transition:all .22s;z-index:100;
+box-shadow:0 4px 12px rgba(0,0,0,.15);letter-spacing:.02em;
+}
+.notify.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── Mode badge ─────────────────────────────── */
+.mbadge{
+padding:2px 8px;border-radius:10px;
+font-family:'JetBrains Mono',monospace;font-size:9px;
+letter-spacing:.06em;text-transform:uppercase;
+border:1px solid transparent;font-weight:500;
+}
+.m-none{border-color:var(--border);color:var(--muted);background:var(--panel2);}
+.m-rmst{border-color:#c5d4e8;color:#8a9bb0;background:#eef3fb;}
+.m-approx{border-color:#f0dcc8;color:var(--accent);background:var(--accent-l);}
+
+.dvd{height:1px;background:var(--border);margin:5px 0;}
+
+/* ── Export Modal ─────────────────────────────── */
+.moverlay{
+position:fixed;inset:0;background:rgba(26,23,20,.55);
+display:flex;align-items:center;justify-content:center;
+z-index:200;opacity:0;pointer-events:none;transition:opacity .2s;
+backdrop-filter:blur(3px);
+}
+.moverlay.show{opacity:1;pointer-events:all;}
+.modal{
+background:var(--panel);border:1px solid var(--border);
+border-radius:12px;width:590px;max-height:82vh;
+display:flex;flex-direction:column;overflow:hidden;
+transform:translateY(10px);transition:transform .2s;
+box-shadow:0 20px 50px rgba(0,0,0,.12);
+}
+.moverlay.show .modal{transform:translateY(0);}
+.mhdr{
+display:flex;align-items:center;justify-content:space-between;
+padding:14px 18px;border-bottom:1px solid var(--border);
+}
+.mtitle{
+font-family:'Lora',serif;font-size:15px;font-weight:500;
+color:var(--text);
+}
+.mclose{
+background:none;border:none;color:var(--muted);
+font-size:20px;cursor:pointer;padding:2px 5px;
+border-radius:4px;line-height:1;transition:color .14s;
+}
+.mclose:hover{color:var(--text);}
+.mbody{padding:16px 18px;overflow-y:auto;flex:1;}
+.mfooter{
+padding:12px 18px;border-top:1px solid var(--border);
+display:flex;gap:8px;justify-content:flex-end;
+background:var(--panel2);
+}
+.etabs{display:flex;gap:4px;margin-bottom:12px;}
+.etab{
+padding:5px 12px;border:1px solid var(--border);
+background:var(--panel2);color:var(--dim);
+font-family:'JetBrains Mono',monospace;font-size:11px;
+cursor:pointer;border-radius:5px;transition:all .14s;font-weight:400;
+}
+.etab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-l);font-weight:500;}
+.econt{display:none;}.econt.active{display:block;}
+.codeblk{
+background:#faf8f5;border:1px solid var(--border);
+border-radius:7px;padding:12px;
+font-family:'JetBrains Mono',monospace;font-size:11px;
+color:var(--text2);white-space:pre;overflow-x:auto;
+line-height:1.65;max-height:280px;overflow-y:auto;
+}
+.dlbtn{
+padding:7px 18px;border:1px solid var(--accent);
+background:var(--accent);color:#fff;
+font-family:'Inter',sans-serif;font-size:12px;font-weight:500;
+cursor:pointer;border-radius:6px;transition:all .14s;
+letter-spacing:.01em;
+}
+.dlbtn:hover{background:var(--accent-h);border-color:var(--accent-h);}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* Draw mode toggle */
+.mode-toggle{
+display:flex;align-items:center;
+background:var(--panel2);border:1px solid var(--border);
+border-radius:6px;padding:2px;gap:2px;flex-shrink:0;
+}
+.mtgl{
+display:flex;align-items:center;gap:5px;
+padding:4px 10px;border:none;background:transparent;
+color:var(--dim);font-family:'JetBrains Mono',monospace;
+font-size:10px;cursor:pointer;border-radius:4px;
+transition:all .15s;white-space:nowrap;
+}
+.mtgl:hover{color:var(--text);}
+.mtgl.active{
+background:var(--panel);color:var(--text);
+box-shadow:0 1px 3px rgba(0,0,0,.08);
+}
+.mtgl-dot{
+width:7px;height:7px;border-radius:50%;flex-shrink:0;
+}
+canvas.cursor-steiner{cursor:cell;}
+
+/* Steiner coord rows — manual variant */
+.spt-row.manual .spt-id{background:#f0ebf8;color:var(--steiner);}
+.spt-row.manual .spt-src{color:var(--steiner);}
+.spt-row.deletable{cursor:pointer;}
+.spt-row.deletable:hover .spt-coords{color:#c53030;}
+.spt-row.deletable:hover .spt-id{opacity:.6;}
+.spt-row{
+display:flex;align-items:center;justify-content:space-between;
+padding:4px 0;border-bottom:1px solid var(--border);
+font-family:'JetBrains Mono',monospace;font-size:10px;
+animation:fin .18s ease;
+}
+.spt-row:last-child{border-bottom:none;}
+.spt-id{
+width:28px;flex-shrink:0;
+font-size:9px;font-weight:600;
+padding:1px 5px;border-radius:3px;
+text-align:center;
+}
+.spt-id.approx-id{background:var(--accent-l);color:var(--accent);}
+.spt-id.manual-id{background:#f0ebf8;color:var(--steiner);}
+.spt-coords{
+color:var(--text2);flex:1;text-align:right;
+letter-spacing:.02em;
+}
+.spt-src{
+font-size:8px;color:var(--muted);
+margin-left:6px;flex-shrink:0;
+text-transform:uppercase;letter-spacing:.06em;
+}
+</style>
+</head>
+<body>
+<header>
+<div class="htitle">
+<h1>直角平面最小 Steiner 树</h1>
+<span class="sub">Rectilinear Steiner Tree · Computation & Demo</span>
+</div>
+<div class="hmeta">
+<span><span class="sdot"></span><span id="hstatus">就绪</span></span>
+<span id="hmode" class="mbadge m-none">待计算</span>
+<span id="hpts">0 pts</span>
+</div>
+</header>
+
+<div class="main">
+<div class="sidebar">
+
+```
+<div class="sec">
+  <div class="stitle">画布操作</div>
+  <button class="btn dng" id="bclear"><span class="bi">✕</span>清空画布</button>
+  <button class="btn" id="bundo"><span class="bi">↩</span>撤销上一点</button>
+  <button class="btn" id="bsample"><span class="bi">⊞</span>加载示例点集</button>
+</div>
+
+<div class="sec">
+  <div class="stitle">算法求解</div>
+  <button class="btn btn-rmst" id="brmst"><span class="bi">⋯</span>直角最小生成树 (RMST)</button>
+  <div class="dvd"></div>
+  <div class="prow" style="margin-top:8px;">
+    <span class="plabel">Steiner 点数量 k</span>
+    <div class="pinput"><button id="kdec">−</button><span class="pval" id="kval">5</span><button id="kinc">+</button></div>
+  </div>
+  <button class="btn btn-approx" id="bapprox"><span class="bi">≈</span>2-近似瓶颈 Steiner 树</button>
+  <div style="font-size:10px;color:var(--muted);margin:-2px 0 8px 23px;">含逐步动画演示</div>
+
+  <div class="srow">
+    <span class="slabel">动画速度</span>
+    <input type="range" class="sslider" id="spslider" min="0" max="100" value="40">
+    <span class="slval" id="splabel">慢</span>
+  </div>
+  <div class="actrls">
+    <button class="abtn" id="apause" disabled>⏸ 暂停</button>
+    <button class="abtn" id="astep" disabled>⏭ 单步</button>
+    <button class="abtn" id="areset" disabled>↺ 重置</button>
+  </div>
+  <div class="apwrap"><div class="apbar" id="apbar"></div></div>
+  <div class="sinfo" id="sinfo">等待执行 2-近似算法…</div>
+</div>
+
+<div class="sec">
+  <div class="stitle">图例</div>
+  <div class="li"><div class="ldot" style="background:var(--terminal)"></div>终端点 (Terminal)</div>
+  <div class="li"><div class="ldot" style="background:var(--steiner)"></div>Steiner 点 (辅助点)</div>
+  <div class="li"><div class="lline" style="background:var(--rmst-col)"></div>RMST（基线，虚线）</div>
+  <div class="li"><div class="lline" style="background:var(--approx-col)"></div>2-近似瓶颈 Steiner 树</div>
+  <div class="li"><div class="ldot" style="background:var(--accent);border-radius:2px"></div>动画目标边（高亮）</div>
+</div>
+
+<div class="sec">
+  <div class="stitle">算法结果</div>
+  <div class="rcard" id="rrmst">
+    <div class="rlabel">RMST 总长度</div>
+    <div class="rval" id="rrmstv" style="color:var(--rmst-col)">—</div>
+    <div class="rsub" id="rrmsts"></div>
+  </div>
+  <div class="rcard" id="rapprox">
+    <div class="rlabel">2-近似最长边</div>
+    <div class="rval" id="rapproxv" style="color:var(--approx-col)">—</div>
+    <div class="rsub" id="rapproxs"></div>
+  </div>
+  <div style="font-size:10px;color:var(--muted);text-align:center;padding:6px;" id="nohint">点击画布添加终端点，选择算法</div>
+</div>
+
+<div class="sec">
+  <div class="stitle">算法对比面板</div>
+  <table class="ctbl">
+    <thead><tr><th>算法</th><th>总长度</th><th>最长边</th><th>优化率</th></tr></thead>
+    <tbody id="ctbody">
+      <tr><td colspan="4" style="color:var(--muted);font-size:10px;text-align:center;padding:8px">执行算法后显示对比</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="sec">
+  <div class="stitle">数据导出</div>
+  <button class="btn exp" id="bexport"><span class="bi">↗</span>导出数据 / 点集 / 树结构</button>
+</div>
+```
+
+</div>
+
+<!-- Canvas -->
+<div class="carea">
+<div class="ctbar">
+<!-- Draw mode toggle -->
+<div class="mode-toggle" id="mode-toggle">
+<button class="mtgl active" id="mode-terminal" title="点击画布放置终端点">
+<span class="mtgl-dot" style="background:var(--terminal)"></span>终端点
+</button>
+<button class="mtgl" id="mode-steiner" title="点击画布手动放置 Steiner 点">
+<span class="mtgl-dot" style="background:var(--steiner)"></span>Steiner 点
+</button>
+</div>
+<span class="chint" id="mode-hint">点击画布添加终端点</span>
+<div style="margin-left:auto;display:flex;gap:4px;align-items:center;" id="vtgls">
+<button class="tbtn active" data-key="showRmst">RMST</button>
+<button class="tbtn active" data-key="showApprox">2-近似</button>
+<button class="tbtn active" data-key="showLabels">标注</button>
+<button class="tbtn active" data-key="showAnim">动画层</button>
+<div style="width:1px;height:16px;background:var(--border);margin:0 4px;"></div>
+<button class="tbtn" id="btn-dl-svg" title="将当前画布导出为 SVG 矢量图" style="display:flex;align-items:center;gap:5px;border-color:var(--accent);color:var(--accent);background:var(--accent-l);font-weight:500;">
+<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M6 1v7M3 6l3 3 3-3M1 10h10"/>
+</svg>
+下载 SVG
+</button>
+</div>
+</div>
+<canvas id="cvs"></canvas>
+<div class="sbar">
+<div class="si"><div class="sil">终端点</div><div class="siv" id="sterm">0</div></div>
+<div class="si"><div class="sil">Steiner 点</div><div class="siv" id="sstein">0</div></div>
+<div class="si"><div class="sil">RMST</div><div class="siv" id="srmst">—</div></div>
+<div class="si"><div class="sil">近似最长边</div><div class="siv" id="smaxe">—</div></div>
+<div class="si"><div class="sil">近似总长度</div><div class="siv" id="sopt">—</div></div>
+</div>
+</div>
+
+<!-- Right panel -->
+<div class="rpanel">
+<div class="sec">
+<div class="stitle">终端点列表</div>
+<div id="ptlist"><div style="font-size:10px;color:var(--muted)">（空）</div></div>
+</div>
+
+```
+<!-- Steiner point coordinate output -->
+<div class="sec" id="spt-sec" style="display:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <div class="stitle" style="margin-bottom:0;">Steiner 点坐标</div>
+    <div style="display:flex;gap:4px;">
+      <span id="spt-badge" style="
+        font-family:'JetBrains Mono',monospace;font-size:9px;
+        padding:1px 6px;border-radius:8px;
+        background:var(--accent-l);color:var(--accent);
+        border:1px solid rgba(201,106,46,.25);font-weight:500;">
+      </span>
+      <button id="btn-copy-spts" title="复制所有坐标" style="
+        padding:1px 7px;border:1px solid var(--border);
+        background:var(--panel2);color:var(--dim);
+        font-family:'JetBrains Mono',monospace;font-size:9px;
+        cursor:pointer;border-radius:4px;transition:all .14s;">
+        复制
+      </button>
+    </div>
+  </div>
+  <div id="spt-list"></div>
+</div>
+
+<div class="sec" style="flex:1;">
+  <div class="stitle">算法日志</div>
+  <div id="logbox"><div class="lentry"><div class="lmsg">系统就绪</div></div></div>
+</div>
+```
+
+</div>
+</div>
+
+<div class="notify" id="nfy"></div>
+
+<!-- Export Modal -->
+<div class="moverlay" id="moverlay">
+<div class="modal">
+<div class="mhdr">
+<span class="mtitle">数据导出</span>
+<button class="mclose" id="mclose">×</button>
+</div>
+<div class="mbody">
+<div class="etabs">
+<button class="etab active" data-tab="json">JSON</button>
+<button class="etab" data-tab="csv">CSV</button>
+<button class="etab" data-tab="py">Python</button>
+<button class="etab" data-tab="svg">SVG</button>
+</div>
+<div class="econt active" id="tab-json"><div class="codeblk" id="ejson"></div></div>
+<div class="econt" id="tab-csv"><div class="codeblk" id="ecsv"></div></div>
+<div class="econt" id="tab-py"><div class="codeblk" id="epy"></div></div>
+<div class="econt" id="tab-svg"><div class="codeblk" id="esvg"></div></div>
+</div>
+<div class="mfooter">
+<button class="dlbtn" id="dlbtn">⬇ 下载文件</button>
+</div>
+</div>
+</div>
+
+<script>
+// ==================== State ====================
+const S = {
+pts:[],k:5,
+manualSpts:[],   // user-placed Steiner points
+drawMode:'terminal', // 'terminal' | 'steiner'
+rmstEdges:null,rmstLen:null,
+approxEI:null,approxSpts:[],approxMax:null,approxLen:null,
+showRmst:true,showApprox:true,showLabels:true,showAnim:true,
+// anim
+asteps:[],aidx:0,arunning:false,apaused:false,atimer:null,aspeed:900,
+aei:[],ahigh:null,aspts:[],
+};
+
+// ==================== Canvas ====================
+const cvs=document.getElementById('cvs'), ctx=cvs.getContext('2d');
+let DPR=1;
+
+function resize(){
+const a=cvs.parentElement;
+const cssW=a.clientWidth;
+const cssH=a.clientHeight-a.querySelector('.ctbar').offsetHeight-document.querySelector('.sbar').offsetHeight;
+DPR=window.devicePixelRatio||1;
+// Set physical pixel size
+cvs.width=Math.round(cssW*DPR);
+cvs.height=Math.round(cssH*DPR);
+// Keep CSS display size
+cvs.style.width=cssW+'px';
+cvs.style.height=cssH+'px';
+// Scale all drawing ops to match DPR
+ctx.setTransform(DPR,0,0,DPR,0,0);
+draw();
+}
+window.addEventListener('resize',resize);
+setTimeout(resize,60);
+
+// ==================== Math ====================
+function md(a,b){return Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1]);}
+function mst(pts){
+const n=pts.length; if(n<2)return[];
+const inT=new Array(n).fill(false),mn=new Array(n).fill(Infinity),par=new Array(n).fill(-1);
+mn[0]=0; const edges=[];
+for(let s=0;s<n;s++){
+let u=-1;
+for(let i=0;i<n;i++) if(!inT[i]&&(u===-1||mn[i]<mn[u]))u=i;
+inT[u]=true;
+if(par[u]!==-1)edges.push([par[u],u,md(pts[par[u]],pts[u])]);
+for(let v=0;v<n;v++) if(!inT[v]){const d=md(pts[u],pts[v]);if(d<mn[v]){mn[v]=d;par[v]=u;}}
+}
+return edges;
+}
+function mstMaxEdge(pts){const e=mst(pts);return e.length?Math.max(...e.map(x=>x[2])):0;}
+
+// ── Iterated 1-Steiner heuristic ─────────────────────────────────────────
+function approx2(terms,k){
+const me=mst(terms);
+const ei=me.map(([u,v,w])=>({u,v,p1:terms[u],p2:terms[v],length:w,sc:0,cm:w}));
+const steps=[];
+steps.push({type:'init',ei:ei.map(e=>({...e})),high:null,msg:`初始化：RMST 共 ${ei.length} 条边，准备分配 ${k} 个 Steiner 点`});
+for(let i=0;i<k;i++){
+ei.sort((a,b)=>[b.cm-a.cm](http://b.cm-a.cm/));
+const t=ei[0];
+t.sc++;t.cm=t.length/(t.sc+1);
+steps.push({type:'assign',ei:ei.map(e=>({...e})),high:{...t},step:i+1,
+msg:`第 ${i+1}/${k} 步：选最长段（边 P${t.u}→P${t.v}，当前段长 ${Math.round(t.length/t.sc)}）→ 分配第 ${t.sc} 个 Steiner 点，新段长 ${Math.round(t.cm)}`});
+}
+const totLen=ei.reduce((s,e)=>s+e.length,0);
+const maxE=Math.max(...ei.map(e=>[e.cm](http://e.cm/)));
+steps.push({type:'done',ei:ei.map(e=>({...e})),high:null,msg:`完成！最长边 ${Math.round(maxE)}，总长 ${Math.round(totLen)}`});
+// compute steiner positions
+const spts=[];
+for(const e of ei){
+if([e.sc](http://e.sc/)>0){
+const[x1,y1]=e.p1,[x2,y2]=e.p2,cnt=e.sc+1;
+for(let j=1;j<cnt;j++){const t=j/cnt;spts.push([x1+(x2-x1)*t,y1+(y2-y1)*t]);}
+}
+}
+return{ei,spts,len:totLen,maxE,steps};
+}
+
+function animSpts(ei){
+const pts=[];
+for(const e of ei){
+if([e.sc](http://e.sc/)>0){
+const[x1,y1]=e.p1,[x2,y2]=e.p2,cnt=e.sc+1;
+for(let j=1;j<cnt;j++){const t=j/cnt;pts.push([x1+(x2-x1)*t,y1+(y2-y1)*t]);}
+}
+}
+return pts;
+}
+
+// ==================== Drawing ====================
+// Light-theme canvas palette
+const C = {
+bg:       '#f5f2ec',  // warm cream
+grid:     'rgba(180,168,155,.35)',
+rmst:     'rgba(138,155,176,.8)',
+approx:   'rgba(46,158,94,.82)',
+steiner:  '#7c4db8',
+steinerRing:'rgba(124,77,184,.28)',
+terminal: '#c96a2e',
+termRing: 'rgba(201,106,46,.22)',
+animHL:   '#c96a2e',
+animBase: 'rgba(46,158,94,.65)',
+animGlow: 'rgba(201,106,46,.25)',
+textDim:  'rgba(122,111,103,.7)',
+labelMain:'rgba(201,106,46,.9)',
+labelSub: 'rgba(201,106,46,.45)',
+};
+
+function draw(){
+// Use CSS pixel dimensions (ctx transform already scales by DPR)
+const w=parseInt(cvs.style.width)||cvs.width;
+const h=parseInt(cvs.style.height)||cvs.height;
+// fill warm cream background
+[ctx.fillStyle=C.bg](http://ctx.fillstyle=c.bg/);ctx.fillRect(0,0,w,h);
+// subtle dot-grid
+ctx.fillStyle=C.grid;
+for(let x=40;x<w;x+=40)for(let y=40;y<h;y+=40){
+ctx.beginPath();ctx.arc(x,y,.8,0,Math.PI*2);ctx.fill();
+}
+if(!S.pts.length){
+ctx.fillStyle='rgba(176,164,154,.55)';
+ctx.font='13px "JetBrains Mono",monospace';ctx.textAlign='center';
+ctx.fillText('点击此处添加终端点',w/2,h/2);
+ctx.font='10px "JetBrains Mono",monospace';
+ctx.fillStyle='rgba(176,164,154,.35)';
+ctx.fillText('Click to place terminal points',w/2,h/2+20);
+return;
+}
+// RMST — dashed steel-blue
+if(S.showRmst&&S.rmstEdges){
+for(const[u,v]of S.rmstEdges)ledge(S.pts[u],S.pts[v],C.rmst,1.5,[5,4]);
+}
+// 2-approx final (when animation finished/not started)
+if(S.showApprox&&S.approxEI&&!S.arunning&&S.aidx===0){
+for(const e of S.approxEI)ledge(e.p1,e.p2,C.approx,2.5,[]);
+for(const sp of S.approxSpts)dstein(sp,C.steiner,4,null);
+}
+// Animation layer
+if(S.showAnim&&(S.arunning||S.aidx>0)&&S.aei.length){
+for(const e of S.aei){
+const isH=(S.ahigh&&e.u===S.ahigh.u&&e.v===S.ahigh.v);
+ledge(e.p1,e.p2,isH?C.animHL:C.animBase,isH?3:2,[]);
+if(isH&&[e.sc](http://e.sc/)>0){
+const[x1,y1]=e.p1,[x2,y2]=e.p2,cnt=e.sc+1;
+for(let j=1;j<cnt;j++){
+const t=j/cnt,sx=x1+(x2-x1)t,sy=y1+(y2-y1)t;
+// soft glow halo
+const g=ctx.createRadialGradient(sx,sy,0,sx,sy,22);
+g.addColorStop(0,C.animGlow);g.addColorStop(1,'rgba(201,106,46,0)');
+ctx.fillStyle=g;ctx.beginPath();ctx.arc(sx,sy,22,0,Math.PI2);ctx.fill();
+dstein([sx,sy],C.animHL,5,C.termRing);
+}
+}
+}
+for(const sp of S.aspts)dstein(sp,C.steiner,4,null);
+}
+// ── Manual Steiner points (user-placed) ─────────────────────────────
+// Draw connecting lines first, then the dots on top
+if(S.manualSpts.length){
+// Build MST over terminals + manual Steiner pts and draw it
+const manualAll=[...S.pts,...S.manualSpts];
+const manualEdges=mst(manualAll);
+for(const[u,v]of manualEdges.map(e=>[e[0],e[1]])){
+ledge(manualAll[u],manualAll[v],'rgba(124,77,184,.55)',1.5,[4,3]);
+}
+// Draw each manual Steiner point
+for(let i=0;i<S.manualSpts.length;i++){
+const[x,y]=S.manualSpts[i];
+// dashed outer ring — distinguishes from algo-generated pts
+ctx.save();
+ctx.strokeStyle=C.steiner;ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+ctx.beginPath();ctx.arc(x,y,11,0,Math.PI2);ctx.stroke();
+ctx.restore();
+// filled core
+dstein([x,y],C.steiner,5,null);
+// label
+if(S.showLabels){
+ctx.fillStyle='rgba(124,77,184,.85)';
+ctx.font='600 10px "JetBrains Mono",monospace';ctx.textAlign='center';
+ctx.fillText(`M${i}`,x,y-15);
+ctx.fillStyle='rgba(124,77,184,.4)';
+ctx.font='9px "JetBrains Mono",monospace';
+ctx.fillText(`(${Math.round(x)},${Math.round(y)})`,x,y+19);
+}
+}
+}
+// Terminal points (top layer)
+for(let i=0;i<S.pts.length;i++){
+const[x,y]=S.pts[i];
+// soft halo
+const g=ctx.createRadialGradient(x,y,0,x,y,16);
+g.addColorStop(0,C.termRing);g.addColorStop(1,'rgba(201,106,46,0)');
+ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,16,0,Math.PI*2);ctx.fill();
+// filled circle
+ctx.fillStyle=C.terminal;ctx.beginPath();ctx.arc(x,y,5.5,0,Math.PI*2);ctx.fill();
+// ring
+ctx.strokeStyle='rgba(201,106,46,.5)';ctx.lineWidth=1.5;
+ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.stroke();
+if(S.showLabels){
+ctx.fillStyle=C.labelMain;ctx.font='600 10px "JetBrains Mono",monospace';ctx.textAlign='center';
+ctx.fillText(`P${i}`,x,y-15);
+ctx.fillStyle=C.labelSub;ctx.font='9px "JetBrains Mono",monospace';
+ctx.fillText(`(${Math.round(x)},${Math.round(y)})`,x,y+19);
+}
+}
+}
+function ledge(p1,p2,col,lw,dash){
+if(!p1||!p2)return;
+ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.setLineDash(dash||[]);
+const[x1,y1]=p1,[x2,y2]=p2;
+ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y1);ctx.lineTo(x2,y2);ctx.stroke();
+ctx.setLineDash([]);
+}
+function dstein(pt,col,r,ringCol){
+const[x,y]=pt;
+ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+if(ringCol){ctx.strokeStyle=ringCol;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,r+4,0,Math.PI*2);ctx.stroke();}
+}
+
+// ==================== Animation ====================
+function startAnim(steps){
+S.asteps=steps;S.aidx=0;S.arunning=true;S.apaused=false;
+S.aei=[];S.aspts=[];S.ahigh=null;
+setAnimBtns(true);runStep();
+}
+function runStep(){
+if(!S.arunning||S.apaused)return;
+if(S.aidx>=S.asteps.length){endAnim();return;}
+applyStep(S.asteps[S.aidx]);S.aidx++;
+document.getElementById('apbar').style.width=(S.aidx/S.asteps.length*100)+'%';
+if(S.aidx<S.asteps.length) S.atimer=setTimeout(runStep,S.aspeed);
+else endAnim();
+}
+function applyStep(step){
+S.aei=step.ei;S.ahigh=step.high||null;
+if(step.type!=='init')S.aspts=animSpts(step.ei);
+document.getElementById('sinfo').textContent=step.msg;
+addLog(`步骤 ${S.aidx+1}`,step.msg);draw();
+}
+function endAnim(){
+S.arunning=false;S.ahigh=null;
+document.getElementById('apbar').style.width='100%';
+setAnimBtns(false);
+updateSteinerList(); // show final Steiner point coordinates
+draw();notify('2-近似算法动画演示完成');
+}
+function setAnimBtns(on){
+document.getElementById('apause').disabled=!on;
+document.getElementById('astep').disabled=!on;
+document.getElementById('areset').disabled=!on;
+}
+
+document.getElementById('apause').addEventListener('click',()=>{
+if(!S.arunning)return;
+S.apaused=!S.apaused;
+document.getElementById('apause').textContent=S.apaused?'▶ 继续':'⏸ 暂停';
+if(!S.apaused)runStep();
+});
+document.getElementById('astep').addEventListener('click',()=>{
+if(!S.arunning)return;
+S.apaused=true;clearTimeout(S.atimer);
+document.getElementById('apause').textContent='▶ 继续';
+if(S.aidx<S.asteps.length){applyStep(S.asteps[S.aidx]);S.aidx++;
+document.getElementById('apbar').style.width=(S.aidx/S.asteps.length*100)+'%';
+if(S.aidx>=S.asteps.length)endAnim();}
+});
+document.getElementById('areset').addEventListener('click',()=>{
+clearTimeout(S.atimer);S.arunning=false;S.apaused=false;S.aidx=0;
+S.aei=[];S.aspts=[];S.ahigh=null;
+document.getElementById('apbar').style.width='0%';
+document.getElementById('sinfo').textContent='动画已重置，可重新执行算法';
+document.getElementById('apause').textContent='⏸ 暂停';
+setAnimBtns(false);draw();
+});
+
+const spsl=document.getElementById('spslider'),splab=document.getElementById('splabel');
+spsl.addEventListener('input',()=>{
+const v=parseInt(spsl.value);
+S.aspeed=Math.round(1800-v*17);
+splab.textContent=['极慢','慢','中','快','极快'][Math.min(4,Math.floor(v/21))];
+});
+
+// ==================== Algorithms ====================
+cvs.addEventListener('click',e=>{
+const r=cvs.getBoundingClientRect();
+const x=e.clientX-r.left;
+const y=e.clientY-r.top;
+if(S.drawMode==='steiner'){
+S.manualSpts.push([x,y]);
+updateSteinerList();
+updateUI();
+addLog('手动 Steiner 点',`M${S.manualSpts.length-1} (${Math.round(x)},${Math.round(y)})`);
+} else {
+S.pts.push([x,y]);
+clearRes();updateUI();
+addLog('添加终端点',`P${S.pts.length-1} (${Math.round(x)},${Math.round(y)})`);
+}
+draw();
+});
+
+document.getElementById('bclear').addEventListener('click',()=>{
+S.pts=[];S.manualSpts=[];clearRes();clearAnim();updateUI();updateSteinerList();
+document.getElementById('logbox').innerHTML='<div class="lentry"><div class="lmsg">画布已清空</div></div>';draw();
+});
+document.getElementById('bundo').addEventListener('click',()=>{
+if(S.drawMode==='steiner'&&S.manualSpts.length){
+S.manualSpts.pop();updateSteinerList();updateUI();
+addLog('撤销','已移除最后一个手动 Steiner 点');draw();
+} else if(S.pts.length){
+S.pts.pop();clearRes();updateUI();
+addLog('撤销','已移除最后一个终端点');draw();
+}
+});
+document.getElementById('bsample').addEventListener('click',()=>{
+const w=cvs.width,h=cvs.height,pd=80;
+S.pts=[[.18,.28],[.48,.12],[.78,.22],[.12,.58],[.42,.48],[.72,.62],[.28,.78],[.62,.84]]
+.map(([rx,ry])=>[pd+rx*(w-2*pd),pd+ry*(h-2*pd)]);
+clearRes();clearAnim();updateUI();addLog('示例','已加载 8 个终端点');draw();
+});
+
+document.getElementById('kdec').addEventListener('click',()=>{if(S.k>1){S.k--;document.getElementById('kval').textContent=S.k;}});
+document.getElementById('kinc').addEventListener('click',()=>{if(S.k<50){S.k++;document.getElementById('kval').textContent=S.k;}});
+
+document.getElementById('brmst').addEventListener('click',()=>{
+if(S.pts.length<2){notify('请至少添加 2 个终端点');return;}
+const t0=performance.now();
+const edges=mst(S.pts),len=edges.reduce((s,e)=>s+e[2],0);
+const me=edges.length?Math.max(...edges.map(e=>e[2])):0;
+S.rmstEdges=edges.map(e=>[e[0],e[1]]);S.rmstLen=len;
+document.getElementById('rrmst').classList.add('active');
+document.getElementById('rrmstv').textContent=Math.round(len);
+document.getElementById('rrmsts').textContent=`${edges.length} 条边，最长边 ${Math.round(me)}`;
+document.getElementById('nohint').style.display='none';
+document.getElementById('srmst').textContent=Math.round(len);
+setMode('rmst');updateCmp();draw();
+addLog('RMST',`总长 ${Math.round(len)}，耗时 ${(performance.now()-t0).toFixed(1)}ms`);
+notify(`RMST · 总长 ${Math.round(len)}`);
+});
+
+document.getElementById('bapprox').addEventListener('click',()=>{
+if(S.pts.length<2){notify('请至少添加 2 个终端点');return;}
+clearAnim();
+const t0=performance.now(),r=approx2(S.pts,S.k);
+S.approxEI=r.ei;S.approxSpts=r.spts;S.approxMax=r.maxE;S.approxLen=r.len;
+document.getElementById('rapprox').classList.add('active');
+document.getElementById('rapproxv').textContent=Math.round(r.maxE);
+document.getElementById('rapproxs').textContent=`最长边 | 总长 ${Math.round(r.len)} | k=${S.k}`;
+document.getElementById('nohint').style.display='none';
+document.getElementById('smaxe').textContent=Math.round(r.maxE);
+setMode('approx');updateCmp();
+addLog(`2-近似 (k=${S.k})`,`最长边 ${Math.round(r.maxE)}，总长 ${Math.round(r.len)}，耗时 ${(performance.now()-t0).toFixed(1)}ms`);
+S.arunning=true;startAnim(r.steps);
+});
+
+// ── Draw mode toggle ──────────────────────────────────────────────────────
+const hints={terminal:'点击画布添加终端点',steiner:'点击画布手动放置 Steiner 点'};
+document.getElementById('mode-terminal').addEventListener('click',()=>{
+S.drawMode='terminal';
+document.getElementById('mode-terminal').classList.add('active');
+document.getElementById('mode-steiner').classList.remove('active');
+document.getElementById('mode-hint').textContent=hints.terminal;
+cvs.classList.remove('cursor-steiner');
+});
+document.getElementById('mode-steiner').addEventListener('click',()=>{
+S.drawMode='steiner';
+document.getElementById('mode-steiner').classList.add('active');
+document.getElementById('mode-terminal').classList.remove('active');
+document.getElementById('mode-hint').textContent=hints.steiner;
+cvs.classList.add('cursor-steiner');
+});
+document.querySelectorAll('#vtgls .tbtn').forEach(btn=>{
+btn.addEventListener('click',()=>{
+const k=btn.dataset.key;S[k]=!S[k];btn.classList.toggle('active',S[k]);draw();
+});
+});
+
+// ==================== UI ====================
+function clearRes(){
+S.rmstEdges=null;
+S.approxEI=null;S.approxSpts=[];S.rmstLen=null;
+['rrmst','rapprox'].forEach(id=>document.getElementById(id).classList.remove('active'));
+document.getElementById('nohint').style.display='';
+document.getElementById('srmst').textContent='—';
+document.getElementById('smaxe').textContent='—';document.getElementById('sopt').textContent='—';
+setMode('none');updateCmp();
+updateSteinerList(); // clear coords panel too
+}
+
+// ── Steiner point coordinate list ─────────────────────────────────────────
+// Merges 2-approx and manual Steiner points into a unified scrollable list.
+function updateSteinerList(){
+const sec=document.getElementById('spt-sec');
+const list=document.getElementById('spt-list');
+const badge=document.getElementById('spt-badge');
+
+const entries=[];
+// Algorithm-generated: 2-approx
+S.approxSpts.forEach((p,i)=>entries.push({p,src:'近似',cls:'approx-id',label:`A${i}`,manual:false}));
+// Manually placed
+S.manualSpts.forEach((p,i)=>entries.push({p,src:'手动',cls:'manual-id',label:`M${i}`,manual:true,idx:i}));
+
+// Always show panel if any manual pts exist
+if(!entries.length&&!S.manualSpts.length){sec.style.display='none';return;}
+sec.style.display='';
+badge.textContent=`${entries.length} 个点`;
+
+list.innerHTML=entries.map(({p,src,cls,label,manual,idx})=>     `<div class="spt-row${manual?' manual deletable':''}"          ${manual?`onclick="removeManualSteiner(${idx})" title="点击删除"`:''}          style="cursor:${manual?'pointer':'default'}">       <span class="spt-id ${cls}">${label}</span>       <span class="spt-coords">(${Math.round(p[0])}, ${Math.round(p[1])})</span>       <span class="spt-src">${src}${manual?' ✕':''}</span>     </div>`).join('');
+}
+
+function removeManualSteiner(i){
+S.manualSpts.splice(i,1);
+updateSteinerList();updateUI();
+addLog('删除','已移除手动 Steiner 点 M'+i);draw();
+}
+
+// Copy all Steiner coordinates as plain text
+document.getElementById('btn-copy-spts').addEventListener('click',()=>{
+const entries=[];
+S.approxSpts.forEach((p,i)=>entries.push(`近似 A${i}\\t(${Math.round(p[0])}, ${Math.round(p[1])})`));
+S.manualSpts.forEach((p,i)=>entries.push(`手动 M${i}\\t(${Math.round(p[0])}, ${Math.round(p[1])})`));
+if(!entries.length){notify('暂无 Steiner 点坐标');return;}
+const text=entries.join('\n');
+navigator.clipboard.writeText(text).then(()=>{
+const btn=document.getElementById('btn-copy-spts');
+btn.textContent='已复制';btn.style.color='var(--approx-col)';btn.style.borderColor='var(--approx-col)';
+setTimeout(()=>{btn.textContent='复制';btn.style.color='';btn.style.borderColor='';},1600);
+}).catch(()=>{
+// fallback
+const ta=document.createElement('textarea');ta.value=text;
+document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+notify('坐标已复制到剪贴板');
+});
+});
+function clearAnim(){
+clearTimeout(S.atimer);S.arunning=false;S.apaused=false;S.aidx=0;
+S.aei=[];S.aspts=[];S.ahigh=null;
+document.getElementById('apbar').style.width='0%';
+document.getElementById('sinfo').textContent='等待执行 2-近似算法…';
+document.getElementById('apause').textContent='⏸ 暂停';setAnimBtns(false);
+}
+function updateUI(){
+const n=S.pts.length;
+document.getElementById('sterm').textContent=n;
+document.getElementById('sstein').textContent=S.approxSpts.length+S.manualSpts.length;
+document.getElementById('hpts').textContent=`${n} pts`;
+const list=document.getElementById('ptlist');
+if(!n){list.innerHTML='<div style="font-size:10px;color:var(--muted)">（空）</div>';}
+else list.innerHTML=S.pts.map((p,i)=>`<span class="pchip" onclick="removePoint(${i})" title="点击删除">P${i} <span style="color:var(--muted)">(${Math.round(p[0])},${Math.round(p[1])})</span></span>`).join('');
+updateSteinerList();
+}
+function removePoint(i){
+S.pts.splice(i,1);clearRes();clearAnim();updateUI();addLog('删除',`已移除 P${i}`);draw();
+}
+function setMode(m){
+const el=document.getElementById('hmode');
+el.className='mbadge m-'+m;
+el.textContent={none:'待计算',rmst:'RMST',approx:'2-近似'}[m]||m;
+}
+}
+function updateCmp(){
+const tbody=document.getElementById('ctbody');
+function mme(edges,pts){return edges&&edges.length?Math.round(Math.max(...edges.map(([u,v])=>md(pts[u],pts[v])))):null;}
+const rmstMe=S.rmstEdges?mme(S.rmstEdges,S.pts):null;
+function row(label,col,len,me,base){
+const ls=len!=null?`<span class="${!base&&S.rmstLen&&len<S.rmstLen?'cbest':'cv'}">${Math.round(len)}</span>`:'<span style="color:var(--muted)">—</span>';
+const ms=me!=null?`<span class="cv">${me}</span>`:'<span style="color:var(--muted)">—</span>';
+const diff=(!base&&S.rmstLen&&len)?`<span class="cdiff">-${((S.rmstLen-len)/S.rmstLen*100).toFixed(1)}%</span>`:'<span style="color:var(--muted)">—</span>';
+return `<tr><td style="color:${col}">${label}</td><td>${ls}</td><td>${ms}</td><td>${diff}</td></tr>`;
+}
+tbody.innerHTML=    `${row('RMST','var(--rmst-col)',S.rmstLen,rmstMe,true)}     ${row('2-近似','var(--approx-col)',S.approxLen,S.approxMax?Math.round(S.approxMax):null,false)}`  ;
+}
+function addLog(label,val){
+const c=document.getElementById('logbox'),e=document.createElement('div');
+e.className='lentry';
+const now=new Date();
+e.innerHTML=`<div class="ltime">${now.toTimeString().slice(0,8)}</div><div class="lmsg">${label} <span class="lval">${val}</span></div>`;
+c.insertBefore(e,c.firstChild);if(c.children.length>40)c.removeChild(c.lastChild);
+}
+function notify(msg){
+const el=document.getElementById('nfy');el.textContent=msg;el.classList.add('show');
+clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+// ==================== Export ====================
+let curTab='json';
+document.getElementById('bexport').addEventListener('click',()=>{buildExport();document.getElementById('moverlay').classList.add('show');});
+document.getElementById('mclose').addEventListener('click',()=>document.getElementById('moverlay').classList.remove('show'));
+document.getElementById('moverlay').addEventListener('click',e=>{if(e.target===document.getElementById('moverlay'))document.getElementById('moverlay').classList.remove('show');});
+document.querySelectorAll('.etab').forEach(tab=>{
+tab.addEventListener('click',()=>{
+document.querySelectorAll('.etab').forEach(t=>t.classList.remove('active'));
+document.querySelectorAll('.econt').forEach(c=>c.classList.remove('active'));
+tab.classList.add('active');curTab=tab.dataset.tab;
+document.getElementById('tab-'+curTab).classList.add('active');
+});
+});
+
+function buildExport(){
+const d=exportData();
+document.getElementById('ejson').textContent=JSON.stringify(d,null,2);
+document.getElementById('ecsv').textContent=toCSV(d);
+document.getElementById('epy').textContent=toPy(d);
+document.getElementById('esvg').textContent=toSVG(d);
+}
+function exportData(){
+return{
+meta:{generated:new Date().toISOString(),canvas:{w:cvs.width,h:cvs.height},description:'Rectilinear Steiner Tree Export'},
+terminals:S.pts.map((p,i)=>({id:`P${i}`,x:Math.round(p[0]),y:Math.round(p[1])})),
+results:{
+rmst:S.rmstLen?{total_length:Math.round(S.rmstLen),max_edge:S.rmstEdges?Math.round(Math.max(...S.rmstEdges.map(([u,v])=>md(S.pts[u],S.pts[v])))):null,edges:S.rmstEdges?S.rmstEdges.map(([u,v])=>({from:`P${u}`,to:`P${v}`,length:Math.round(md(S.pts[u],S.pts[v]))})):[]}:null,
+bottleneck_2approx:S.approxLen?{k:S.k,total_length:Math.round(S.approxLen),max_edge_length:Math.round(S.approxMax),steiner_points:S.approxSpts.map((p,i)=>({id:`A${i}`,x:Math.round(p[0]),y:Math.round(p[1])})),edges:S.approxEI?S.approxEI.map(e=>({from:`P${e.u}`,to:`P${e.v}`,original_length:Math.round(e.length),steiner_count:e.sc,max_segment:Math.round([e.cm](http://e.cm/))})):[]}:null,
+}
+};
+}
+function toCSV(d){
+let s='# Rectilinear Steiner Tree Export\n# Terminals\ntype,id,x,y\n';
+for(const t of d.terminals)s+=`terminal,${t.id},${t.x},${t.y}\\n`;
+if(d.results.bottleneck_2approx?.steiner_points?.length){s+='\n# 2-Approx Steiner Points\n';for(const p of d.results.bottleneck_2approx.steiner_points)s+=`approx_steiner,${p.id},${p.x},${p.y}\\n`;}
+s+='\n# Edges\nalgorithm,from,to,length\n';
+if(d.results.rmst?.edges)for(const e of d.results.rmst.edges)s+=`RMST,${e.from},${e.to},${e.length}\\n`;
+if(d.results.bottleneck_2approx?.edges)for(const e of d.results.bottleneck_2approx.edges)s+=`2APPROX,${e.from},${e.to},${e.original_length}\\n`;
+return s;
+}
+function toPy(d){
+const pts=d.terminals.map(t=>`(${t.x}, ${t.y})`).join(', ');
+let s=`# Rectilinear Steiner Tree - Python\\nimport numpy as np\\nimport matplotlib.pyplot as plt\\nimport matplotlib.patches as mpatches\\n\\n`;
+s+=`terminals = [${pts}]\\n\\n`;
+if(d.results.bottleneck_2approx){const r=d.results.bottleneck_2approx;s+=`approx_k = ${r.k}\\napprox_steiner = [${r.steiner_points.map(p=>`(${p.x},${p.y})`).join(',')||''}]\\napprox_total = ${r.total_length}\\napprox_max_edge = ${r.max_edge_length}\\n\\n`;}
+s+=`# Plot\\nfig, ax = plt.subplots(figsize=(9,7))\\ntx=[p[0] for p in terminals]; ty=[p[1] for p in terminals]\\nax.scatter(tx, ty, c='#ff6b35', s=90, zorder=5, label='Terminals')\\nfor i,(x,y) in enumerate(terminals):\\n    ax.annotate(f'P{i}', (x,y), textcoords='offset points', xytext=(5,5), fontsize=9)\\nplt.title('Rectilinear Steiner Tree')\\nplt.legend(); plt.axis('equal'); plt.tight_layout(); plt.show()\\n`;
+return s;
+}
+function toSVG(d){
+const W=cvs.width,H=cvs.height;
+let s=`<svg xmlns="<http://www.w3.org/2000/svg>" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">\\n`;
+s+=  `<rect width="${W}" height="${H}" fill="#0a0e1a"/>\\n`;
+if(d.results.rmst?.edges){
+s+=  `<g id="rmst" stroke="#607080" stroke-width="1.5" stroke-dasharray="5,4" fill="none" opacity="0.8">\\n`;
+for(const e of d.results.rmst.edges){
+const pi=parseInt(e.from.slice(1)),pj=parseInt(e.to.slice(1));
+const p1=d.terminals[pi],p2=d.terminals[pj];
+s+=    `<polyline points="${p1.x},${p1.y} ${p2.x},${p1.y} ${p2.x},${p2.y}"/>\\n`;
+}
+s+=  `</g>\\n`;
+}
+s+=  `<g id="terminals" fill="#ff6b35">\\n`;
+for(const t of d.terminals)s+=    `<circle cx="${t.x}" cy="${t.y}" r="5"/>\\n    <text x="${t.x}" y="${t.y-10}" fill="#ff6b35" font-size="10" text-anchor="middle" font-family="monospace">${t.id}</text>\\n`;
+s+=  `</g>\\n  <text x="10" y="${H-10}" fill="#334155" font-size="9" font-family="monospace">Generated: ${d.meta.generated}</text>\\n</svg>`;
+return s;
+}
+
+document.getElementById('dlbtn').addEventListener('click',()=>{
+const exts={json:'json',csv:'csv',py:'py',svg:'svg'};
+const mimes={json:'application/json',csv:'text/csv',py:'text/x-python',svg:'image/svg+xml'};
+const content=document.getElementById('e'+curTab).textContent;
+const blob=new Blob([content],{type:mimes[curTab]});
+const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+a.download=`steiner_tree.${exts[curTab]}`;a.click();
+notify(`已下载 steiner_tree.${exts[curTab]}`);
+});
+
+// ==================== Canvas → SVG Download ====================
+// Reconstructs every visible layer from current state as clean SVG vectors.
+// The output is infinitely scalable and compatible with Illustrator / Figma / Inkscape.
+function downloadCanvasSVG(){
+if(!S.pts.length){notify('请先添加终端点');return;}
+
+const W=parseInt(cvs.style.width)||cvs.width;
+const H=parseInt(cvs.style.height)||cvs.height;
+const ts=new Date();
+const now=ts.toISOString().slice(0,19).replace('T',' ');
+// Filename: steiner_YYYYMMDD_HHMMSS.svg
+const fname=`steiner_${ts.toISOString().slice(0,10).replace(/-/g,'')}_${ts.toTimeString().slice(0,8).replace(/:/g,'')}.svg`;
+
+// Colours — exact mirror of the C palette used in draw()
+const COL={
+bg:'#f5f2ec',
+grid:'rgba(180,168,155,0.30)',
+rmst:'rgba(138,155,176,0.85)',
+approx:'rgba(46,158,94,0.85)',
+steiner:'#7c4db8',
+steinerRing:'rgba(124,77,184,0.28)',
+terminal:'#c96a2e',
+termRing:'rgba(201,106,46,0.22)',
+label:'rgba(201,106,46,0.92)',
+labelSub:'rgba(201,106,46,0.48)',
+dimText:'#b0a49a',
+animHL:'#c96a2e',
+};
+
+// Round to 2 decimal places for compact output
+const r=v=>Math.round(v*100)/100;
+
+// L-shaped rectilinear path: horizontal then vertical
+function lpath(p1,p2){
+if(!p1||!p2)return '';
+return `M${r(p1[0])},${r(p1[1])} H${r(p2[0])} V${r(p2[1])}`;
+}
+
+const parts=[];
+
+// ── <defs>: Google Fonts import so text renders correctly everywhere ──
+parts.push(`<defs>   <style>@import url('<https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;display=swap>');</style> </defs>`);
+
+// ── Background ───────────────────────────────────────────────────────
+parts.push(`<rect width="${W}" height="${H}" fill="${COL.bg}"/>`);
+
+// ── Dot grid (using <pattern> for compact SVG) ───────────────────────
+parts.push(`<defs>   <pattern id="dotgrid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">     <circle cx="40" cy="40" r="0.8" fill="${COL.grid}"/>   </pattern> </defs> <rect width="${W}" height="${H}" fill="url(#dotgrid)"/>`);
+
+// ── RMST edges ───────────────────────────────────────────────────────
+if(S.showRmst&&S.rmstEdges&&S.rmstEdges.length){
+const paths=S.rmstEdges.map(([u,v])=>
+`<path d="${lpath(S.pts[u],S.pts[v])}" stroke="${COL.rmst}" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>`
+).filter(Boolean);
+parts.push(`<g id="rmst" opacity="1">\\n  ${paths.join('\\n  ')}\\n</g>`);
+}
+
+// ── 2-Approx final result ────────────────────────────────────────────
+const showFinalApprox=S.showApprox&&S.approxEI&&!S.arunning&&S.aidx===0;
+if(showFinalApprox){
+const paths=S.approxEI.map(e=>
+`<path d="${lpath(e.p1,e.p2)}" stroke="${COL.approx}" stroke-width="2.5" fill="none"/>`
+).filter(Boolean);
+const spts=S.approxSpts.map(sp=>
+`<circle cx="${r(sp[0])}" cy="${r(sp[1])}" r="4" fill="${COL.steiner}"/>`
+);
+parts.push(`<g id="approx">\\n  ${paths.join('\\n  ')}\\n</g>`);
+if(spts.length) parts.push(`<g id="approx-steiner">\\n  ${spts.join('\\n  ')}\\n</g>`);
+}
+
+// ── Animation layer snapshot (captures current mid-anim frame) ───────
+const showAnimSnap=S.showAnim&&(S.arunning||S.aidx>0)&&S.aei.length;
+if(showAnimSnap){
+const paths=S.aei.map(e=>{
+const isH=S.ahigh&&e.u===S.ahigh.u&&e.v===S.ahigh.v;
+return `<path d="${lpath(e.p1,e.p2)}" stroke="${isH?COL.animHL:COL.approx}" stroke-width="${isH?3:2}" fill="none"/>`;
+}).filter(Boolean);
+const spts=S.aspts.map(sp=>
+`<circle cx="${r(sp[0])}" cy="${r(sp[1])}" r="4" fill="${COL.steiner}"/>`
+);
+const hlPts=[];
+if(S.ahigh){
+const e=S.ahigh;
+const[x1,y1]=e.p1,[x2,y2]=e.p2,cnt=e.sc+1;
+for(let j=1;j<cnt;j++){
+const t=j/cnt,sx=r(x1+(x2-x1)*t),sy=r(y1+(y2-y1)*t);
+hlPts.push(`<circle cx="${sx}" cy="${sy}" r="20" fill="${COL.termRing}"/>`);
+hlPts.push(`<circle cx="${sx}" cy="${sy}" r="9"  fill="${COL.termRing}"/>`);
+hlPts.push(`<circle cx="${sx}" cy="${sy}" r="5"  fill="${COL.animHL}"/>`);
+}
+}
+parts.push(`<g id="anim-layer">\\n  ${[...paths,...hlPts,...spts].join('\\n  ')}\\n</g>`);
+}
+
+// ── Terminal points ──────────────────────────────────────────────────
+const termEls=S.pts.map((p,i)=>{
+const x=r(p[0]),y=r(p[1]);
+const labelEls=S.showLabels?   `<text x="${x}" y="${y-16}" text-anchor="middle"         font-family="'JetBrains Mono',monospace" font-size="10" font-weight="600"         fill="${COL.label}">P${i}</text>   <text x="${x}" y="${y+21}" text-anchor="middle"         font-family="'JetBrains Mono',monospace" font-size="8.5"         fill="${COL.labelSub}">(${Math.round(p[0])},${Math.round(p[1])})</text>`:'';
+return `\\   <!-- terminal P${i} -->   <circle cx="${x}" cy="${y}" r="16" fill="${COL.termRing}"/>   <circle cx="${x}" cy="${y}" r="9"  fill="none" stroke="${COL.terminal}" stroke-width="1.5" opacity="0.5"/>   <circle cx="${x}" cy="${y}" r="5.5" fill="${COL.terminal}"/>   ${labelEls}`;
+});
+parts.push(`<g id="terminals">\\n${termEls.join('\\n')}\\n</g>`);
+
+// ── Legend (bottom-left, always included) ────────────────────────────
+const legendItems=[];
+if(S.rmstEdges)  legendItems.push({col:COL.rmst,   dash:'5,4',label:'RMST'});
+if(S.approxEI)   legendItems.push({col:COL.approx, dash:'',   label:`2-近似 (k=${S.k})`});
+if(legendItems.length){
+const LX=14,LY=H-14-legendItems.length*18;
+const els=legendItems.map((it,i)=>{
+const y=LY+i*18;
+return `\\   <line x1="${LX}" y1="${y}" x2="${LX+22}" y2="${y}" stroke="${it.col}" stroke-width="2" stroke-dasharray="${it.dash}"/>   <text x="${LX+28}" y="${y+4}" font-family="'JetBrains Mono',monospace" font-size="9" fill="${COL.dimText}">${it.label}</text>`;
+});
+parts.push(`<g id="legend">\\n${els.join('\\n')}\\n</g>`);
+}
+
+// ── Metadata footer ──────────────────────────────────────────────────
+parts.push(`<text x="10" y="${H-6}" font-family="'JetBrains Mono',monospace" font-size="7.5" fill="${COL.dimText}">Rectilinear Steiner Tree · n=${S.pts.length} terminals · ${now}</text>`);
+
+// ── Assemble final SVG ───────────────────────────────────────────────
+const svg=`<?xml version="1.0" encoding="UTF-8"?> <svg xmlns="<http://www.w3.org/2000/svg>"      width="${W}" height="${H}"      viewBox="0 0 ${W} ${H}"      shape-rendering="geometricPrecision"      text-rendering="optimizeLegibility">   <title>Rectilinear Steiner Tree — n=${S.pts.length}</title>   <desc>Generated ${now} · Iterated 1-Steiner heuristic</desc> ${parts.join('\\n')} </svg>`;
+
+const blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
+const a=document.createElement('a');
+a.href=URL.createObjectURL(blob);
+a.download=fname;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+setTimeout(()=>URL.revokeObjectURL(a.href),8000);
+notify(`矢量图已下载 · ${fname}`);
+}
+
+document.getElementById('btn-dl-svg').addEventListener('click', downloadCanvasSVG);
+
+// Init
+updateUI();
+</script>
+</body>
+</html>
